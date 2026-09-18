@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Galactic Meteor Shooter</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #050510;
+      color: #fff;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    h1 { margin: 5px 0; font-size: 24px; text-shadow: 0 0 8px #00d2ff; }
+    p { margin: 5px 0 15px 0; color: #aaa; font-size: 14px; }
+    canvas {
+      border: 2px solid #00d2ff;
+      box-shadow: 0 0 20px rgba(0, 210, 255, 0.4);
+      background: #000;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>GALACTIC METEOR SHOOTER</h1>
+  <p>Use <b>Left/Right Arrows</b> to Move & <b>Spacebar</b> to Shoot</p>
+  <canvas id="gameCanvas" width="600" height="700"></canvas>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Game state
+    let score = 0;
+    let gameOver = false;
+
+    // Player spaceship
+    const player = {
+      x: canvas.width / 2 - 20,
+      y: canvas.height - 60,
+      width: 40,
+      height: 40,
+      speed: 6,
+      dx: 0
+    };
+
+    // Arrays for active projectiles and meteors
+    const lasers = [];
+    const meteors = [];
+
+    // Track keyboard controls
+    const keys = {};
+
+    document.addEventListener('keydown', (e) => {
+      keys[e.code] = true;
+      if (e.code === 'Space' && !gameOver) {
+        // Shoot laser
+        lasers.push({
+          x: player.x + player.width / 2 - 3,
+          y: player.y,
+          width: 6,
+          height: 15,
+          speed: 8
+        });
+      }
+      if (e.code === 'KeyR' && gameOver) {
+        resetGame();
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      keys[e.code] = false;
+    });
+
+    // Spawn meteors at intervals
+    function spawnMeteor() {
+      if (gameOver) return;
+      const radius = Math.random() * 20 + 15;
+      meteors.push({
+        x: Math.random() * (canvas.width - radius * 2) + radius,
+        y: -radius,
+        radius: radius,
+        speed: Math.random() * 2 + 2 + (score * 0.05) // Gets faster as score rises
+      });
+    }
+    setInterval(spawnMeteor, 1000);
+
+    function resetGame() {
+      score = 0;
+      gameOver = false;
+      meteors.length = 0;
+      lasers.length = 0;
+      player.x = canvas.width / 2 - 20;
+      animate();
+    }
+
+    function update() {
+      if (gameOver) return;
+
+      // Handle player movement
+      if (keys['ArrowLeft'] && player.x > 0) {
+        player.x -= player.speed;
+      }
+      if (keys['ArrowRight'] && player.x < canvas.width - player.width) {
+        player.x += player.speed;
+      }
+
+      // Update laser positions
+      for (let i = lasers.length - 1; i >= 0; i--) {
+        lasers[i].y -= lasers[i].speed;
+        if (lasers[i].y < 0) lasers.splice(i, 1);
+      }
+
+      // Update meteor positions and handle collisions
+      for (let i = meteors.length - 1; i >= 0; i--) {
+        const m = meteors[i];
+        m.y += m.speed;
+
+        // Check laser hits
+        for (let j = lasers.length - 1; j >= 0; j--) {
+          const l = lasers[j];
+          if (
+            l.x < m.x + m.radius &&
+            l.x + l.width > m.x - m.radius &&
+            l.y < m.y + m.radius &&
+            l.y + l.height > m.y - m.radius
+          ) {
+            meteors.splice(i, 1);
+            lasers.splice(j, 1);
+            score += 10;
+            break;
+          }
+        }
+
+        // Check if meteor hits ground or player
+        if (m) {
+          // Check player collision
+          const playerCenterX = player.x + player.width / 2;
+          const playerCenterY = player.y + player.height / 2;
+          const dist = Math.hypot(m.x - playerCenterX, m.y - playerCenterY);
+
+          if (dist < m.radius + player.width / 2 || m.y - m.radius > canvas.height) {
+            gameOver = true;
+          }
+        }
+      }
+    }
+
+    function draw() {
+      // Clear screen
+      ctx.fillStyle = '#050510';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Draw Player Ship (Triangle shape)
+      ctx.fillStyle = '#00d2ff';
+      ctx.beginPath();
+      ctx.moveTo(player.x + player.width / 2, player.y);
+      ctx.lineTo(player.x, player.y + player.height);
+      ctx.lineTo(player.x + player.width, player.y + player.height);
+      ctx.closePath();
+      ctx.fill();
+
+      // Draw Lasers
+      ctx.fillStyle = '#ff4757';
+      lasers.forEach(l => {
+        ctx.fillRect(l.x, l.y, l.width, l.height);
+      });
+
+      // Draw Meteors
+      ctx.fillStyle = '#a4b0be';
+      meteors.forEach(m => {
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, m.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#57606f';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      });
+
+      // Draw HUD (Score)
+      ctx.fillStyle = '#fff';
+      ctx.font = '20px sans-serif';
+      ctx.fillText(`Score: ${score}`, 20, 35);
+
+      // Draw Game Over Screen
+      if (gameOver) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = '#ff4757';
+        ctx.font = '36px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 20);
+
+        ctx.fillStyle = '#fff';
+        ctx.font = '18px sans-serif';
+        ctx.fillText(`Final Score: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
+        ctx.fillText('Press "R" to Restart', canvas.width / 2, canvas.height / 2 + 60);
+        ctx.textAlign = 'left';
+      }
+    }
+
+    function animate() {
+      update();
+      draw();
+      if (!gameOver) {
+        requestAnimationFrame(animate);
+      }
+    }
+
+    animate();
+  </script>
+</body>
+</html>
